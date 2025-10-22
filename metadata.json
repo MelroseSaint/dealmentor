@@ -1,0 +1,7 @@
+{
+  "name": "DealMentor AI",
+  "description": "An AI-powered sales and business coaching intelligence platform. It analyzes call transcripts to provide a sentiment graph and a coaching card with feedback on performance.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
