@@ -19,33 +19,50 @@ const Dashboard: React.FC<DashboardProps> = ({ analysisResult, onBack, onUpdateS
   const [isDownloading, setIsDownloading] = useState(false);
 
   const handleDownloadSession = async () => {
+    if (isDownloading) return; // Prevent multiple downloads
+    
     setIsDownloading(true);
+    let audioGenerated = false;
+    
     try {
       let sessionToDownload = { ...analysisResult };
 
       // 1. Generate audio if it doesn't exist
-      if (!sessionToDownload.audioFeedbackBase64) {
-        const feedbackText = coachingTips.map(tip => `${tip.title}. ${tip.suggestion}`).join('\n\n');
-        if (feedbackText) {
-          const audioBase64 = await getTextToSpeech(`Here are your key areas for improvement: ${feedbackText}`);
-          sessionToDownload.audioFeedbackBase64 = audioBase64;
-          onUpdateSession(sessionToDownload); // Save the updated session with audio
+      if (!sessionToDownload.audioFeedbackBase64 && coachingTips.length > 0) {
+        try {
+          const feedbackText = coachingTips.map(tip => `${tip.title}. ${tip.suggestion}`).join('\n\n');
+          if (feedbackText) {
+            const audioBase64 = await getTextToSpeech(`Here are your key areas for improvement: ${feedbackText}`);
+            sessionToDownload.audioFeedbackBase64 = audioBase64;
+            onUpdateSession(sessionToDownload); // Save updated session with audio
+            audioGenerated = true;
+          }
+        } catch (audioError) {
+          console.warn("Failed to generate audio, continuing without it:", audioError);
+          // Continue without audio
         }
       }
 
-      // 2. Create the ZIP file
+      // 2. Create ZIP file
       const zip = new JSZip();
 
-      // 3. Add audio file
+      // 3. Add audio file if available
       if (sessionToDownload.audioFeedbackBase64) {
-        const audioBytes = decode(sessionToDownload.audioFeedbackBase64);
-        zip.file('feedback.wav', audioBytes);
+        try {
+          const audioBytes = decode(sessionToDownload.audioFeedbackBase64);
+          zip.file('feedback.wav', audioBytes);
+        } catch (audioError) {
+          console.warn("Failed to process audio for download:", audioError);
+        }
       }
 
       // 4. Create and add text report
       let report = `DealMentor AI - Analysis Report\n`;
       report += `=====================================\n\n`;
-      report += `Session Date: ${new Date(date).toLocaleString()}\n\n`;
+      report += `Session Date: ${new Date(date).toLocaleString()}\n`;
+      if (audioGenerated) {
+        report += `Audio Feedback: Generated\n\n`;
+      }
       report += `--- SUMMARY ---\n${summary}\n\n`;
       report += `--- COACHING TIPS ---\n`;
       coachingTips.forEach(tip => {

@@ -8,7 +8,7 @@ import LiveConversation from './LiveConversation';
 import type { AnalysisResult } from '../types';
 import { getSessions, saveSession, deleteSession } from '../utils/storage';
 
-const LiquidEther = lazy(() => import('./LiquidEther.tsx'));
+const LiquidEther = lazy(() => import('./LiquidEther'));
 
 type View = 'home' | 'recording' | 'analysis' | 'live' | 'dashboard' | 'processing';
 

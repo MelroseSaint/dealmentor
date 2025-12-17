@@ -83,7 +83,9 @@ const RecordingView: React.FC<RecordingViewProps> = ({ onAnalysisComplete, onBac
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+    if (dataArrayRef.current) {
+      analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
+    }
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const barWidth = (canvas.width / dataArrayRef.current.length) * 1.5;
@@ -103,6 +105,11 @@ const RecordingView: React.FC<RecordingViewProps> = ({ onAnalysisComplete, onBac
     if (mediaRecorderRef.current && status === 'recording') {
       mediaRecorderRef.current.stop();
       if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (visualizerFrameRef.current) cancelAnimationFrame(visualizerFrameRef.current);
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(console.error);
+        audioContextRef.current = null;
+      }
     }
   };
 
@@ -167,6 +174,9 @@ const RecordingView: React.FC<RecordingViewProps> = ({ onAnalysisComplete, onBac
         if (visualizerFrameRef.current) cancelAnimationFrame(visualizerFrameRef.current);
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();
+        }
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            audioContextRef.current.close().catch(console.error);
         }
     }
   }, []);

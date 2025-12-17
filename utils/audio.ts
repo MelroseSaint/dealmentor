@@ -42,8 +42,9 @@ export async function decodeAudioData(
 }
 
 export async function playAudioFromBase64(base64String: string) {
+    let audioContext: AudioContext | null = null;
     try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         const decodedBytes = decode(base64String);
         const audioBuffer = await decodeAudioData(decodedBytes, audioContext, 24000, 1);
         
@@ -51,8 +52,18 @@ export async function playAudioFromBase64(base64String: string) {
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
         source.start();
+        
+        // Clean up after playback
+        source.addEventListener('ended', () => {
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close().catch(console.error);
+            }
+        });
     } catch (error) {
         console.error("Failed to play audio:", error);
+        if (audioContext && audioContext.state !== 'closed') {
+            audioContext.close().catch(console.error);
+        }
         alert("Could not play audio feedback. See console for details.");
     }
 }

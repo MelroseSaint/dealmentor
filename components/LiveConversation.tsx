@@ -48,25 +48,43 @@ const LiveConversation: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
 
     if (scriptProcessorRef.current) {
-      scriptProcessorRef.current.disconnect();
+      try {
+        scriptProcessorRef.current.disconnect();
+      } catch (e) {
+        console.error("Error disconnecting script processor", e);
+      }
       scriptProcessorRef.current = null;
     }
 
     if (sourceNodeRef.current) {
-      sourceNodeRef.current.disconnect();
+      try {
+        sourceNodeRef.current.disconnect();
+      } catch (e) {
+        console.error("Error disconnecting source node", e);
+      }
       sourceNodeRef.current = null;
     }
 
-    if (inputAudioContextRef.current && inputAudioContextRef.current.state !== 'closed') {
-      await inputAudioContextRef.current.close();
-      inputAudioContextRef.current = null;
-    }
-    
-    if (outputAudioContextRef.current && outputAudioContextRef.current.state !== 'closed') {
-      playingSourcesRef.current.forEach(source => source.stop());
-      playingSourcesRef.current.clear();
-      await outputAudioContextRef.current.close();
-      outputAudioContextRef.current = null;
+    try {
+      if (inputAudioContextRef.current && inputAudioContextRef.current.state !== 'closed') {
+        await inputAudioContextRef.current.close();
+        inputAudioContextRef.current = null;
+      }
+      
+      if (outputAudioContextRef.current && outputAudioContextRef.current.state !== 'closed') {
+        playingSourcesRef.current.forEach(source => {
+          try {
+            source.stop();
+          } catch (e) {
+            console.error("Error stopping audio source", e);
+          }
+        });
+        playingSourcesRef.current.clear();
+        await outputAudioContextRef.current.close();
+        outputAudioContextRef.current = null;
+      }
+    } catch (e) {
+      console.error("Error closing audio contexts", e);
     }
 
     isStoppingRef.current = false;
@@ -86,7 +104,11 @@ const LiveConversation: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       nextStartTimeRef.current = 0;
       
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      const apiKey = import.meta.env.VITE_API_KEY;
+      if (!apiKey) {
+        throw new Error('API key is missing. Please set VITE_API_KEY in your environment variables.');
+      }
+      const ai = new GoogleGenAI({ apiKey });
 
       sessionPromiseRef.current = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -117,7 +139,7 @@ const LiveConversation: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 int16[i] = inputData[i] * 32768;
               }
               const pcmBlob = {
-                data: encode(new Uint8Array(int16.buffer)),
+                data: encode(new Uint8Array(int16.buffer.slice(0))),
                 mimeType: 'audio/pcm;rate=16000',
               };
               sessionPromiseRef.current?.then((session) => {
@@ -162,7 +184,8 @@ const LiveConversation: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               currentOutputTranscriptionRef.current = '';
             }
 
-            const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData.data;
+            const parts = message.serverContent?.modelTurn?.parts;
+            const base64Audio = parts?.[0]?.inlineData?.data;
             if (base64Audio && outputAudioContextRef.current) {
               try {
                 const outputCtx = outputAudioContextRef.current;
